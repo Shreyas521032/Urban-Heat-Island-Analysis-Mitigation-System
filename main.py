@@ -399,11 +399,7 @@ def main():
 
 # Run the application
 if __name__ == "__main__":
-    main()"""
-Urban Heat Island Analysis & Mitigation System - Streamlined Version
-Author: Claude AI
-Date: June 2025
-"""
+    main()
 
 import streamlit as st
 import numpy as np
