@@ -66,15 +66,6 @@ def load_sample_data():
         'surface_temperature': surface_temp, 'land_use': land_use, 'distance_from_center': dist_from_center
     })
 
-def get_satellite_ndvi_data(lat, lon, date=None):
-    """Mock function to simulate fetching NDVI data from satellite imagery"""
-    np.random.seed(int(lat*100 + lon*100))
-    lat_center, lon_center = 40.7128, -74.0060
-    dist = np.sqrt((lat - lat_center)**2 + (lon - lon_center)**2)
-    normalized_dist = min(dist / 0.1, 1)  # 0.1 is max_dist
-    ndvi_value = -0.1 + normalized_dist * 0.7 + np.random.normal(0, 0.05)
-    return max(-1, min(1, ndvi_value))  # Clamp to valid range
-
 def get_temperature_prediction(features):
     """Predict temperature based on urban features"""
     return (25 + 5 * features['building_density'] - 4 * features['vegetation_index'] - 
@@ -381,82 +372,11 @@ def show_dashboard(data):
 def show_uhi_detection(data):
     """Display the UHI detection and analysis module"""
     st.markdown('<h2 class="sub-header">UHI Detection & Analysis</h2>', unsafe_allow_html=True)
-    st.markdown('<div class="card">This module uses satellite imagery and street-level data to detect urban heat island hotspots. Upload your own data or use our demo data to visualize UHI patterns.</div>', unsafe_allow_html=True)
     
     # Create tabs
-    tab1, tab2, tab3 = st.tabs(["Satellite Analysis", "Cluster Analysis", "Temporal Analysis"])
+    tab1, tab2, tab3 = st.tabs(["Cluster Analysis", "Temporal Analysis"])
     
     with tab1:
-        st.markdown("### Satellite-Based UHI Detection")
-        st.write("Select an area to analyze or use the demo data:")
-        
-        # Input controls
-        col1, col2 = st.columns(2)
-        with col1:
-            location = st.selectbox("Select location:", ["New York City, NY", "Custom Location"])
-            lat, lon = (40.7128, -74.0060) if location == "New York City, NY" else (
-                st.number_input("Latitude:", value=40.7128, format="%.4f"),
-                st.number_input("Longitude:", value=-74.0060, format="%.4f")
-            )
-        
-        with col2:
-            analysis_date = st.date_input("Select date for analysis:", datetime.date(2025, 6, 1))
-            data_source = st.selectbox("Data source:", ["Landsat 9", "Sentinel-2", "MODIS"])
-        
-        # Run analysis
-        if st.button("Run Satellite Analysis"):
-            st.markdown("#### Analysis Results")
-            
-            # Metrics
-            cols = st.columns(3)
-            with cols[0]:
-                ndvi = get_satellite_ndvi_data(lat, lon, analysis_date)
-                st.metric("NDVI Index", f"{ndvi:.2f}", "-0.05")
-            with cols[1]:
-                surface_temp = data[data['latitude'].between(lat-0.01, lat+0.01) & 
-                                    data['longitude'].between(lon-0.01, lon+0.01)]['surface_temperature'].mean()
-                st.metric("Surface Temperature", f"{surface_temp:.1f}°C", "+2.3°C")
-            with cols[2]:
-                building_density = data[data['latitude'].between(lat-0.01, lat+0.01) & 
-                                        data['longitude'].between(lon-0.01, lon+0.01)]['building_density'].mean()
-                st.metric("Building Density", f"{building_density:.2f}", "+0.04")
-            
-            # Heat map
-            st.markdown("#### Surface Temperature Map")
-            area_data = data[data['latitude'].between(lat-0.03, lat+0.03) & data['longitude'].between(lon-0.03, lon+0.03)]
-            m = folium.Map(location=[lat, lon], zoom_start=14, tiles='CartoDB positron')
-            heat_data = [[row['latitude'], row['longitude'], row['surface_temperature']] for _, row in area_data.iterrows()]
-            HeatMap(heat_data, radius=15, gradient={0.4: 'blue', 0.65: 'lime', 0.8: 'yellow', 1: 'red'},
-                   min_opacity=0.5, blur=10).add_to(m)
-            folium.Marker([lat, lon], popup=f"Selected Location<br>NDVI: {ndvi:.2f}<br>Temp: {surface_temp:.1f}°C",
-                         icon=folium.Icon(color="red", icon="info-sign")).add_to(m)
-            folium_static(m)
-            
-            # NDVI vs Temperature
-            st.markdown("#### NDVI vs Surface Temperature")
-            fig = px.scatter(area_data, x='vegetation_index', y='surface_temperature', color='surface_temperature',
-                            color_continuous_scale='Thermal', title='Vegetation Index vs Surface Temperature',
-                            labels={'vegetation_index': 'Vegetation Index (NDVI)', 
-                                   'surface_temperature': 'Surface Temperature (°C)'})
-            fig.update_layout(height=400)
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Analysis summary
-            st.markdown("#### Analysis Summary")
-            avg_temp = area_data['surface_temperature'].mean()
-            uhi_severity = "Severe" if avg_temp > 30 else "Moderate" if avg_temp > 27 else "Low"
-            impact = "High" if avg_temp > 30 else "Medium" if avg_temp > 27 else "Low"
-            
-            st.markdown(f"""
-            **UHI Severity:** {uhi_severity}  
-            **Potential Impact:** {impact}  
-            **Key Factors:**
-            - Building density contributes approximately {(building_density * 100):.1f}% to the UHI effect
-            - Vegetation cover is {(area_data['vegetation_index'].mean() * 100):.1f}% of the analyzed area
-            - Average surface temperature is {avg_temp:.1f}°C, which is {avg_temp - 25:.1f}°C above the baseline temperature
-            """)
-    
-    with tab2:
         st.markdown("### UHI Cluster Analysis")
         st.write("This analysis identifies similar urban areas based on their heat characteristics.")
         
@@ -508,7 +428,7 @@ def show_uhi_detection(data):
         display_df = display_df[['Cluster', 'Description', 'Temperature (°C)', 'Building Density', 'Vegetation', 'Albedo']]
         st.dataframe(display_df.round(2))
     
-    with tab3:
+    with tab2:
         st.markdown("### Temporal UHI Analysis")
         st.write("Analyze how UHI patterns change over time.")
         
