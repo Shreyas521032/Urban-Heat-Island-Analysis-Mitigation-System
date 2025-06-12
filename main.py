@@ -765,7 +765,7 @@ def show_temperature_prediction(data):
             fig = go.Figure(data=[go.Contour(
                 z=Z, x=building_range, y=vegetation_range, colorscale='Thermal',
                 contours=dict(start=22, end=30, size=0.5, showlabels=True),
-                colorbar=dict(title='Temperature (°C)', titleside='right')
+                colorbar=dict(title='Temperature (°C)')
             )])
             
             fig.update_layout(title='Temperature Prediction by Building Density and Vegetation',
