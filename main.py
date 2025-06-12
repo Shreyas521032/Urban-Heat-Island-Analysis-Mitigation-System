@@ -102,7 +102,7 @@ def create_cluster_map(data, n_clusters=5):
     # Create map
     colors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3']
     m = folium.Map(location=[data['latitude'].mean(), data['longitude'].mean()], 
-                  zoom_start=12, tiles='CartDB positron')
+                  zoom_start=12, tiles='CartoDB positron')
     
     # Add markers and legend
     for idx, row in data.iterrows():
