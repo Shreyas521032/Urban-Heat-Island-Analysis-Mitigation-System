@@ -374,7 +374,7 @@ def show_uhi_detection(data):
     st.markdown('<h2 class="sub-header">UHI Detection & Analysis</h2>', unsafe_allow_html=True)
     
     # Create tabs
-    tab1, tab2, tab3 = st.tabs(["Cluster Analysis", "Temporal Analysis"])
+    tab1, tab2 = st.tabs(["Cluster Analysis", "Temporal Analysis"])
     
     with tab1:
         st.markdown("### UHI Cluster Analysis")
