@@ -977,7 +977,6 @@ def show_intervention_planning(data):
                 - Urban streams restoration
                 - Blue roofs
                 """)
-
 def show_optimization(data):
     """Display the optimization and simulation module"""
     st.markdown('<h2 class="sub-header">Optimization & Simulation</h2>', unsafe_allow_html=True)
@@ -1354,7 +1353,7 @@ def main():
     
     # Sidebar navigation
     st.sidebar.image("https://www.epa.gov/sites/default/files/styles/medium/public/2020-07/urban-heat-island.jpg", 
-                    use_column_width=True)
+                    use_container_width=True)
     st.sidebar.title("Navigation")
     
     # Page selection
