@@ -71,11 +71,18 @@ def load_sample_data():
 def get_satellite_ndvi_data(lat, lon, date=None):
     """Mock function to simulate fetching NDVI data from satellite imagery"""
     np.random.seed(int(lat*100 + lon*100))
-    lat_center, lon_center = 40.7128, -74.0060
+    lat_center, lon_center = 21.1458, 79.0882  # Nagpur coordinates
     dist = np.sqrt((lat - lat_center)**2 + (lon - lon_center)**2)
     normalized_dist = min(dist / 0.1, 1)  # 0.1 is max_dist
     ndvi_value = -0.1 + normalized_dist * 0.7 + np.random.normal(0, 0.05)
     return max(-1, min(1, ndvi_value))  # Clamp to valid range
+
+def get_ground_temperature_data(lat, lon, date=None):
+    """Mock function to simulate fetching ground temperature data"""
+    np.random.seed(int(lat*100 + lon*100))
+    base_temp = 32
+    variation = np.random.normal(0, 2)
+    return base_temp + variation
 
 def get_temperature_prediction(features):
     """Predict temperature based on urban features"""
@@ -95,7 +102,7 @@ def create_cluster_map(data, n_clusters=5):
     # Create map
     colors = ['#FF5733', '#33FF57', '#3357FF', '#F3FF33', '#FF33F3']
     m = folium.Map(location=[data['latitude'].mean(), data['longitude'].mean()], 
-                  zoom_start=12, tiles='CartoDB positron')
+                  zoom_start=12, tiles='CartDB positron')
     
     # Add markers and legend
     for idx, row in data.iterrows():
@@ -383,62 +390,67 @@ def show_dashboard(data):
 def show_uhi_detection(data):
     """Display the UHI detection and analysis module"""
     st.markdown('<h2 class="sub-header">UHI Detection & Analysis</h2>', unsafe_allow_html=True)
-    st.markdown('<div class="card">This module uses satellite imagery and street-level data to detect urban heat island hotspots. Upload your own data or use our demo data to visualize UHI patterns.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card">This module uses ground temperature measurements and urban feature analysis to detect urban heat island hotspots in Nagpur.</div>', unsafe_allow_html=True)
     
     # Create tabs
-    tab1, tab2, tab3 = st.tabs(["Satellite Analysis", "Cluster Analysis", "Temporal Analysis"])
+    tab1, tab2, tab3 = st.tabs(["Temperature Analysis", "Cluster Analysis", "Temporal Analysis"])
     
     with tab1:
-        st.markdown("### Satellite-Based UHI Detection")
+        st.markdown("### Ground Temperature Analysis")
         st.write("Select an area to analyze or use the demo data:")
         
         # Input controls
         col1, col2 = st.columns(2)
         with col1:
-            location = st.selectbox("Select location:", ["New York City, NY", "Custom Location"])
-            lat, lon = (40.7128, -74.0060) if location == "New York City, NY" else (
-                st.number_input("Latitude:", value=40.7128, format="%.4f"),
-                st.number_input("Longitude:", value=-74.0060, format="%.4f")
-            )
+            location = st.selectbox("Select location:", ["Nagpur City Center", "Dharampeth", "Sadar", "Custom Location"])
+            if location == "Nagpur City Center":
+                lat, lon = 21.1458, 79.0882
+            elif location == "Dharampeth":
+                lat, lon = 21.1350, 79.0650
+            elif location == "Sadar":
+                lat, lon = 21.1530, 79.0800
+            else:  # Custom Location
+                lat = st.number_input("Latitude:", value=21.1458, format="%.4f")
+                lon = st.number_input("Longitude:", value=79.0882, format="%.4f")
         
         with col2:
             analysis_date = st.date_input("Select date for analysis:", datetime.date(2025, 6, 1))
-            data_source = st.selectbox("Data source:", ["Landsat 9", "Sentinel-2", "MODIS"])
+            measurement_type = st.selectbox("Measurement type:", ["Ground Temperature", "Surface Temperature"])
         
         # Run analysis
-        if st.button("Run Satellite Analysis"):
+        if st.button("Run Temperature Analysis"):
             st.markdown("#### Analysis Results")
             
             # Metrics
             cols = st.columns(3)
             with cols[0]:
-                ndvi = get_satellite_ndvi_data(lat, lon, analysis_date)
-                st.metric("NDVI Index", f"{ndvi:.2f}", "-0.05")
+                ground_temp = get_ground_temperature_data(lat, lon, analysis_date)
+                st.metric("Ground Temperature", f"{ground_temp:.1f}°C", "+3.2°C")
             with cols[1]:
                 surface_temp = data[data['latitude'].between(lat-0.01, lat+0.01) & 
-                                    data['longitude'].between(lon-0.01, lon+0.01)]['surface_temperature'].mean()
-                st.metric("Surface Temperature", f"{surface_temp:.1f}°C", "+2.3°C")
+                                   data['longitude'].between(lon-0.01, lon+0.01)]['surface_temperature'].mean()
+                st.metric("Surface Temperature", f"{surface_temp:.1f}°C", "+4.5°C")
             with cols[2]:
                 building_density = data[data['latitude'].between(lat-0.01, lat+0.01) & 
-                                        data['longitude'].between(lon-0.01, lon+0.01)]['building_density'].mean()
+                                       data['longitude'].between(lon-0.01, lon+0.01)]['building_density'].mean()
                 st.metric("Building Density", f"{building_density:.2f}", "+0.04")
             
             # Heat map
-            st.markdown("#### Surface Temperature Map")
+            st.markdown("#### Temperature Map")
             area_data = data[data['latitude'].between(lat-0.03, lat+0.03) & data['longitude'].between(lon-0.03, lon+0.03)]
             m = folium.Map(location=[lat, lon], zoom_start=14, tiles='CartoDB positron')
             heat_data = [[row['latitude'], row['longitude'], row['surface_temperature']] for _, row in area_data.iterrows()]
             HeatMap(heat_data, radius=15, gradient={0.4: 'blue', 0.65: 'lime', 0.8: 'yellow', 1: 'red'},
                    min_opacity=0.5, blur=10).add_to(m)
-            folium.Marker([lat, lon], popup=f"Selected Location<br>NDVI: {ndvi:.2f}<br>Temp: {surface_temp:.1f}°C",
+            folium.Marker([lat, lon], popup=f"Selected Location<br>Ground Temp: {ground_temp:.1f}°C<br>Surface Temp: {surface_temp:.1f}°C",
                          icon=folium.Icon(color="red", icon="info-sign")).add_to(m)
             folium_static(m)
             
-            # NDVI vs Temperature
-            st.markdown("#### NDVI vs Surface Temperature")
-            fig = px.scatter(area_data, x='vegetation_index', y='surface_temperature', color='surface_temperature',
-                            color_continuous_scale='Thermal', title='Vegetation Index vs Surface Temperature',
-                            labels={'vegetation_index': 'Vegetation Index (NDVI)', 
+            # Temperature vs density analysis
+            st.markdown("#### Building Density vs Temperature")
+            fig = px.scatter(area_data, x='building_density', y='surface_temperature', color='surface_temperature',
+                            color_continuous_scale='Thermal', title='Building Density vs Surface Temperature',
+                            labels={'building_density': 'Building Density', 
                                    'surface_temperature': 'Surface Temperature (°C)'})
             fig.update_layout(height=400)
             st.plotly_chart(fig, use_container_width=True)
@@ -446,15 +458,14 @@ def show_uhi_detection(data):
             # Analysis summary
             st.markdown("#### Analysis Summary")
             avg_temp = area_data['surface_temperature'].mean()
-            uhi_severity = "Severe" if avg_temp > 30 else "Moderate" if avg_temp > 27 else "Low"
-            impact = "High" if avg_temp > 30 else "Medium" if avg_temp > 27 else "Low"
+            uhi_severity = "Severe" if avg_temp > 35 else "Moderate" if avg_temp > 32 else "Low"
+            impact = "High" if avg_temp > 35 else "Medium" if avg_temp > 32 else "Low"
             
             st.markdown(f"""
             **UHI Severity:** {uhi_severity}  
             **Potential Impact:** {impact}  
             **Key Factors:**
             - Building density contributes approximately {(building_density * 100):.1f}% to the UHI effect
-            - Vegetation cover is {(area_data['vegetation_index'].mean() * 100):.1f}% of the analyzed area
             - Average surface temperature is {avg_temp:.1f}°C, which is {avg_temp - 25:.1f}°C above the baseline temperature
             """)
     
@@ -484,9 +495,6 @@ def show_uhi_detection(data):
         fig.update_layout(height=500)
         st.plotly_chart(fig, use_container_width=True)
         
-        # Cluster summary
-        st.markdown("#### Cluster Summary")
-        cluster_descriptions = []
         # Cluster summary
         st.markdown("#### Cluster Summary")
         cluster_descriptions = []
@@ -785,17 +793,17 @@ def show_intervention_planning(data):
         
         # Location input
         if location_method == "Map Selection":
-            st.write("Map will appear here in a real application.")
-            lat = st.number_input("Latitude:", value=40.7128, format="%.4f")
-            lon = st.number_input("Longitude:", value=-74.0060, format="%.4f")
+            st.write("Map coordinates:")
+            lat = st.number_input("Latitude:", value=21.1458, format="%.4f")
+            lon = st.number_input("Longitude:", value=79.0882, format="%.4f")
         else:
-            address = st.text_input("Enter address:", "Times Square, New York, NY")
+            address = st.text_input("Enter address:", "Nagpur, Maharashtra")
             if address:
                 st.write("Address geocoded to coordinates:")
-                lat, lon = 40.7580, -73.9855  # Times Square coordinates
+                lat, lon = 21.1458, 79.0882  # Nagpur coordinates
                 st.write(f"Latitude: {lat}, Longitude: {lon}")
             else:
-                lat, lon = 40.7128, -74.0060  # Default NYC coordinates
+                lat, lon = 21.1458, 79.0882  # Default Nagpur coordinates
         
         # Parameters
         radius = st.slider("Analysis radius (km):", 0.5, 5.0, 1.0, 0.5)
@@ -977,74 +985,9 @@ def show_intervention_planning(data):
                 """)
 
 def show_optimization(data):
-    st.markdown('<h2 class="sub-header">Optimization & Simulation</h2>', unsafe_allow_html=True)
-    st.markdown('<div class="card">This module uses optimization algorithms to find the most effective allocation of resources for UHI mitigation in Nagpur. It allows planners to simulate different scenarios and compare outcomes.</div>', unsafe_allow_html=True)
-    
-    # Create tabs
-    tab1, tab2 = st.tabs(["Resource Optimization", "Scenario Simulation"])
-    
-    with tab1:
-        st.markdown("### Resource Allocation Optimization")
-        
-        # Inputs
-        budget_level = st.select_slider("Budget level:", options=["low", "medium", "high"])
-        priority = st.selectbox("Optimization priority:", ["temperature", "cost", "implementation"])
-        
-        if st.button("UHI detection"):
-    st.markdown('<h2 class="sub-header">UHI Detection & Analysis</h2>', unsafe_allow_html=True)
-    st.markdown('<div class="card">This module uses ground temperature measurements and urban feature analysis to detect urban heat island hotspots in Nagpur.</div>', unsafe_allow_html=True)
-    
-    # Create tabs
-    tab1, tab2 = st.tabs(["Temperature Analysis", "Cluster Analysis"])
-    
-    with tab1:
-        st.markdown("### Ground Temperature Analysis")
-        st.write("Select an area to analyze or use the demo data:")
-        
-        # Input controls
-        col1, col2 = st.columns(2)
-        with col1:
-            location = st.selectbox("Select location:", ["Nagpur City Center", "Dharampeth", "Sadar", "Custom Location"])
-            if location == "Nagpur City Center":
-                lat, lon = 21.1458, 79.0882
-            elif location == "Dharampeth":
-                lat, lon = 21.1350, 79.0650
-            elif location == "Sadar":
-                lat, lon = 21.1530, 79.0800
-            else:  # Custom Location
-                lat = st.number_input("Latitude:", value=21.1458, format="%.4f")
-                lon = st.number_input("Longitude:", value=79.0882, format="%.4f")
-        
-        with col2:
-            analysis_date = st.date_input("Select date for analysis:", datetime.date(2025, 6, 1))
-            measurement_type = st.selectbox("Measurement type:", ["Ground Temperature", "Surface Temperature"])
-        
-        # Run analysis
-        if st.button("Run Temperature Analysis"):
-            st.markdown("#### Analysis Results")
-            
-            # Metrics
-            cols = st.columns(3)
-            with cols[0]:
-                ground_temp = get_ground_temperature_data(lat, lon, analysis_date)
-                st.metric("Ground Temperature", f"{ground_temp:.1f}°C", "+3.2°C")
-            with cols[1]:
-                surface_temp = data[data['latitude'].between(lat-0.01, lat+0.01) & 
-                                   data['longitude'].between(lon-0.01, lon+0.01)]['surface_temperature'].mean()
-                st.metric("Surface Temperature", f"{surface_temp:.1f}°C", "+4.5°C")
-            with cols[2]:
-                building_density = data[data['latitude'].between(lat-0.01, lat+0.01) & 
-                                       data['longitude'].between(lon-0.01, lon+0.01)]['building_density'].mean()
-                st.metric("Building Density", f"{building_density:.2f}", "+0.04")
-            
-            # Heat map
-            st.markdown("#### Temperature Map")
-            area_data = data[data['latitude'].between(lat-0.03, lat+0.03) & data['longitude'].between(lon-0.03, lon+0.03)]
-            m = folium.Map(location=[lat, lon], zoom_start=14, tiles='CartoDB positron')
-            heat_data = [[row['latitude'], row['longitude'], row['surface_temperature']] for _, row in area_data.iterrows()]def show_optimization(data):
     """Display the optimization and simulation module"""
     st.markdown('<h2 class="sub-header">Optimization & Simulation</h2>', unsafe_allow_html=True)
-    st.markdown('<div class="card">This module uses optimization algorithms to find the most effective allocation of resources for UHI mitigation. It allows planners to simulate different scenarios and compare outcomes.</div>', unsafe_allow_html=True)
+    st.markdown('<div class="card">This module uses optimization algorithms to find the most effective allocation of resources for UHI mitigation in Nagpur. It allows planners to simulate different scenarios and compare outcomes.</div>', unsafe_allow_html=True)
     
     # Create tabs
     tab1, tab2 = st.tabs(["Resource Optimization", "Scenario Simulation"])
@@ -1062,8 +1005,8 @@ def show_optimization(data):
             
             # Display metrics
             col1, col2, col3 = st.columns(3)
-            with col1: st.metric("Total Budget", f"${results['budget']}")
-            with col2: st.metric("Used Budget", f"${results['used_budget']}", 
+            with col1: st.metric("Total Budget", f"₹{results['budget']:,}")
+            with col2: st.metric("Used Budget", f"₹{results['used_budget']:,}", 
                                f"{results['used_budget']/results['budget']*100:.1f}%")
             with col3: st.metric("Temperature Reduction", f"{results['estimated_temperature_reduction']:.2f}°C")
             
@@ -1073,7 +1016,7 @@ def show_optimization(data):
             
             fig = px.bar(allocation_df, x='cost', y='name', orientation='h', color='temperature_reduction',
                         color_continuous_scale='Blues', title='Intervention Resource Allocation',
-                        labels={'cost': 'Budget Allocation ($)', 'name': 'Intervention',
+                        labels={'cost': 'Budget Allocation (₹)', 'name': 'Intervention',
                                'temperature_reduction': 'Temp. Reduction (°C)'}, text='units')
             fig.update_traces(texttemplate='%{text} units', textposition='inside')
             fig.update_layout(height=400)
@@ -1094,8 +1037,8 @@ def show_optimization(data):
             cost_effectiveness = allocation_df.sort_values('cost_per_degree')
             
             fig = px.bar(cost_effectiveness, x='name', y='cost_per_degree', color='type',
-                        title='Cost per Degree of Cooling ($ / °C)',
-                        labels={'cost_per_degree': 'Cost per °C Reduction ($)', 'name': 'Intervention'})
+                        title='Cost per Degree of Cooling (₹ / °C)',
+                        labels={'cost_per_degree': 'Cost per °C Reduction (₹)', 'name': 'Intervention'})
             fig.update_layout(height=400)
             st.plotly_chart(fig, use_container_width=True)
             
@@ -1241,14 +1184,14 @@ def show_optimization(data):
                     risk_level, risk_color = "Low", "#2ecc71"
                 
                 # Calculate additional metrics
-                extreme_heat_days_current = sum(current_temps > 30) / len(current_temps) * 365
-                extreme_heat_days_future = sum(future_temps > 30) / len(future_temps) * 365
+                extreme_heat_days_current = sum(current_temps > 35) / len(current_temps) * 365
+                extreme_heat_days_future = sum(future_temps > 35) / len(future_temps) * 365
                 
                 st.markdown(f"""
                 <div style="padding:20px; background-color:{risk_color}25; border-left:5px solid {risk_color}; margin-bottom:20px;">
                     <h4>Heat Wave Risk Level: <span style="color:{risk_color}">{risk_level}</span></h4>
                     <p>
-                        <strong>Days over 30°C per year:</strong><br>
+                        <strong>Days over 35°C per year:</strong><br>
                         Current (2025): {extreme_heat_days_current:.1f} days<br>
                         Projected ({year}): {extreme_heat_days_future:.1f} days<br>
                         <strong>Increase: {extreme_heat_days_future - extreme_heat_days_current:.1f} days</strong>
@@ -1341,7 +1284,7 @@ def show_about():
     with col1:
         st.markdown("""
         #### Detection & Analysis
-        - Satellite imagery analysis for UHI detection
+        - Ground temperature measurements for UHI detection
         - Street-level temperature mapping
         - Temporal and spatial pattern identification
         - Cluster analysis of similar urban areas
@@ -1373,7 +1316,7 @@ def show_about():
     st.markdown("""
     This system integrates multiple technologies and data sources:
     
-    - **Satellite Data**: Utilizes freely available Landsat, Sentinel-2, and MODIS data
+    - **Ground Measurements**: Utilizes local weather station and sensor data
     - **Machine Learning**: Employs random forest and gradient boosting models
     - **Optimization Algorithms**: Uses multi-objective optimization for planning
     - **GIS Integration**: Provides spatial analysis and mapping capabilities
@@ -1386,16 +1329,17 @@ def show_about():
     # Data sources
     st.markdown("### Data Sources")
     st.markdown("""
-    The system can utilize data from various free sources:
+    The system can utilize data from various sources:
     
-    - NASA Earth Data (https://earthdata.nasa.gov/)
-    - USGS Earth Explorer (https://earthexplorer.usgs.gov/)
-    - Copernicus Open Access Hub (https://scihub.copernicus.eu/)
-    - OpenStreetMap (https://www.openstreetmap.org/)
-    - National Weather Service (https://www.weather.gov/)
-    - Local municipal GIS data portals
+    - Local weather stations and meteorological departments
+    - Municipal GIS data portals
+    - OpenStreetMap for building and land use data
+    - National/State environmental monitoring networks
+    - Citizen science temperature monitoring projects
+    - Academic research datasets
     
-    For demonstration purposes, this app uses synthetic data that simulates realistic urban temperature patterns.
+    For demonstration purposes, this app uses synthetic data that simulates realistic urban temperature patterns
+    based on Nagpur's geographic and climatic conditions.
     """)
 
 # ---------- MAIN APPLICATION ----------
@@ -1410,15 +1354,14 @@ def main():
     st.markdown("""
     <div class="highlight">
         This AI-based system helps city planners and environmental scientists analyze urban heat island (UHI) effects 
-        and develop data-driven strategies to mitigate their impact. Using satellite imagery, environmental data, 
-        and machine learning, it provides insights for sustainable urban planning.
+        and develop data-driven strategies to mitigate their impact. Using ground measurements, environmental data, 
+        and machine learning, it provides insights for sustainable urban planning in Nagpur, Maharashtra.
     </div>
     """, unsafe_allow_html=True)
     
     # Sidebar navigation
-    st.sidebar.image("https://www.epa.gov/sites/default/files/styles/medium/public/2020-07/urban-heat-island.jpg", 
-                    use_container_width=True)
-    st.sidebar.title("Navigation")
+    st.sidebar.title("🌆 UHI Analysis System")
+    st.sidebar.markdown("Navigate through different modules to analyze urban heat patterns and plan mitigation strategies.")
     
     # Page selection
     page = st.sidebar.radio("Select a Module", 
@@ -1429,15 +1372,21 @@ def main():
     data = load_sample_data()
     
     # Display selected page
-    if page == "Dashboard": show_dashboard(data)
-    elif page == "UHI Detection": show_uhi_detection(data)
-    elif page == "Temperature Prediction": show_temperature_prediction(data)
-    elif page == "Intervention Planning": show_intervention_planning(data)
-    elif page == "Optimization & Simulation": show_optimization(data)
-    elif page == "About": show_about()
+    if page == "Dashboard": 
+        show_dashboard(data)
+    elif page == "UHI Detection": 
+        show_uhi_detection(data)
+    elif page == "Temperature Prediction": 
+        show_temperature_prediction(data)
+    elif page == "Intervention Planning": 
+        show_intervention_planning(data)
+    elif page == "Optimization & Simulation": 
+        show_optimization(data)
+    elif page == "About": 
+        show_about()
     
     # Footer
-    st.markdown('<div class="footer">Urban Heat Island Analysis & Mitigation System © 2025</div>', 
+    st.markdown('<div class="footer">Urban Heat Island Analysis & Mitigation System © 2025 | Built for Nagpur, Maharashtra</div>', 
                unsafe_allow_html=True)
 
 # Run the application
