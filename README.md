@@ -214,22 +214,6 @@ We welcome contributions! Please follow these steps:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
-
-- **Streamlit** for the excellent web app framework
-- **Plotly** for interactive visualizations
-- **Folium** for geospatial mapping capabilities
-- **Scikit-learn** for machine learning algorithms
-- **OpenStreetMap** for geographic data
-
-## 📞 Support
-
-For support, questions, or suggestions:
-
-- **Create an issue** on GitHub
-- **Email:** support@uhianalysis.com
-- **Documentation:** Check the `docs/` folder for detailed guides
-
 ## 🔮 Future Enhancements
 
 - [ ] Real-time data integration with weather APIs
