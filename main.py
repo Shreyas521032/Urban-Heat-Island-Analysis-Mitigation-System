@@ -1352,8 +1352,6 @@ def main():
     """, unsafe_allow_html=True)
     
     # Sidebar navigation
-    st.sidebar.image("https://www.epa.gov/sites/default/files/styles/medium/public/2020-07/urban-heat-island.jpg", 
-                    use_container_width=True)
     st.sidebar.title("Navigation")
     
     # Page selection
