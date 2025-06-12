@@ -1,3 +1,410 @@
+def show_optimization(data):
+    """Display the optimization and simulation module"""
+    st.markdown('<h2 class="sub-header">Optimization & Simulation</h2>', unsafe_allow_html=True)
+    st.markdown('<div class="card">This module uses optimization algorithms to find the most effective allocation of resources for UHI mitigation. It allows planners to simulate different scenarios and compare outcomes.</div>', unsafe_allow_html=True)
+    
+    # Create tabs
+    tab1, tab2 = st.tabs(["Resource Optimization", "Scenario Simulation"])
+    
+    with tab1:
+        st.markdown("### Resource Allocation Optimization")
+        
+        # Inputs
+        budget_level = st.select_slider("Budget level:", options=["low", "medium", "high"])
+        priority = st.selectbox("Optimization priority:", ["temperature", "cost", "implementation"])
+        
+        if st.button("Run Optimization"):
+            # Get optimization results
+            results = optimize_interventions(data, budget_level, priority)
+            
+            # Display metrics
+            col1, col2, col3 = st.columns(3)
+            with col1: st.metric("Total Budget", f"${results['budget']}")
+            with col2: st.metric("Used Budget", f"${results['used_budget']}", 
+                               f"{results['used_budget']/results['budget']*100:.1f}%")
+            with col3: st.metric("Temperature Reduction", f"{results['estimated_temperature_reduction']:.2f}°C")
+            
+            # Resource allocation chart
+            st.markdown("#### Resource Allocation")
+            allocation_df = pd.DataFrame(results['allocation'])
+            
+            fig = px.bar(allocation_df, x='cost', y='name', orientation='h', color='temperature_reduction',
+                        color_continuous_scale='Blues', title='Intervention Resource Allocation',
+                        labels={'cost': 'Budget Allocation ($)', 'name': 'Intervention',
+                               'temperature_reduction': 'Temp. Reduction (°C)'}, text='units')
+            fig.update_traces(texttemplate='%{text} units', textposition='inside')
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Type distribution
+            type_summary = allocation_df.groupby('type').agg({
+                'cost': 'sum', 'temperature_reduction': 'sum', 'units': 'sum'
+            }).reset_index()
+            
+            fig = px.pie(type_summary, values='cost', names='type',
+                        title='Budget Distribution by Intervention Type', hole=0.4)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Cost-effectiveness analysis
+            st.markdown("#### Cost-Effectiveness Analysis")
+            allocation_df['cost_per_degree'] = allocation_df['cost'] / allocation_df['temperature_reduction']
+            cost_effectiveness = allocation_df.sort_values('cost_per_degree')
+            
+            fig = px.bar(cost_effectiveness, x='name', y='cost_per_degree', color='type',
+                        title='Cost per Degree of Cooling ($ / °C)',
+                        labels={'cost_per_degree': 'Cost per °C Reduction ($)', 'name': 'Intervention'})
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Implementation timeline
+            st.markdown("#### Implementation Timeline")
+            
+            # Create simple timeline data
+            timeline_data = []
+            start_date = datetime.date(2025, 7, 1)
+            
+            for i, row in allocation_df.iterrows():
+                # Assign durations based on type
+                if row['type'] == 'Green Infrastructure': duration = 90
+                elif row['type'] == 'High-Albedo Surfaces': duration = 60
+                elif row['type'] == 'Water Features': duration = 120
+                else: duration = 30
+                
+                end_date = start_date + datetime.timedelta(days=duration)
+                timeline_data.append({
+                    'Task': row['name'], 'Start': start_date, 'Finish': end_date, 'Type': row['type']
+                })
+                start_date = start_date + datetime.timedelta(days=30)
+            
+            timeline_df = pd.DataFrame(timeline_data)
+            
+            fig = px.timeline(timeline_df, x_start='Start', x_end='Finish', y='Task',
+                             color='Type', title='Implementation Timeline')
+            fig.update_yaxes(autorange="reversed")
+            fig.update_layout(height=400)
+            st.plotly_chart(fig, use_container_width=True)
+    
+    with tab2:
+        st.markdown("### Future Scenario Simulation")
+        
+        # Inputs
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.markdown("#### Scenario Parameters")
+            year = st.slider("Target Year:", 2025, 2050, 2030, 5)
+            urban_growth = st.select_slider("Urban Growth Rate:", options=["Low", "Medium", "High"])
+            climate_scenario = st.select_slider("Climate Change Scenario:", 
+                                               options=["Optimistic", "Moderate", "Pessimistic"])
+            mitigation_level = st.select_slider("UHI Mitigation Implementation:", 
+                                              options=["Minimal", "Moderate", "Aggressive"])
+            simulate_button = st.button("Run Simulation")
+        
+        with col2:
+            if simulate_button:
+                st.markdown("#### Simulation Results")
+                
+                # Calculate climate scenario impacts
+                if climate_scenario == "Optimistic":
+                    climate_increase = 0.5 * (year - 2025) / 5  # 0.5°C per 5 years
+                elif climate_scenario == "Moderate":
+                    climate_increase = 1.0 * (year - 2025) / 5  # 1.0°C per 5 years
+                else:  # Pessimistic
+                    climate_increase = 1.5 * (year - 2025) / 5  # 1.5°C per 5 years
+                
+                # Calculate urban growth impacts
+                if urban_growth == "Low":
+                    growth_factor = 0.2 * (year - 2025) / 5  # 0.2°C per 5 years
+                elif urban_growth == "Medium":
+                    growth_factor = 0.5 * (year - 2025) / 5  # 0.5°C per 5 years
+                else:  # High
+                    growth_factor = 0.8 * (year - 2025) / 5  # 0.8°C per 5 years
+                
+                # Calculate mitigation effects
+                if mitigation_level == "Minimal":
+                    mitigation_effect = 0.2 * (year - 2025) / 5  # 0.2°C reduction per 5 years
+                elif mitigation_level == "Moderate":
+                    mitigation_effect = 0.7 * (year - 2025) / 5  # 0.7°C reduction per 5 years
+                else:  # Aggressive
+                    mitigation_effect = 1.2 * (year - 2025) / 5  # 1.2°C reduction per 5 years
+                
+                # Calculate UHI change
+                current_uhi = data['air_temperature'].mean() - 25  # Assuming 25°C is the baseline
+                future_uhi = current_uhi + climate_increase + growth_factor - mitigation_effect
+                
+                # Display results
+                st.markdown(f"""
+                #### Projected UHI Intensity for {year}
+                
+                **Current UHI Intensity (2025):** {current_uhi:.2f}°C  
+                **Projected UHI Intensity ({year}):** {future_uhi:.2f}°C  
+                
+                **Contributing Factors:**
+                - Climate change impact: +{climate_increase:.2f}°C
+                - Urban growth impact: +{growth_factor:.2f}°C
+                - Mitigation effect: -{mitigation_effect:.2f}°C
+                
+                **Net Change:** {future_uhi - current_uhi:.2f}°C
+                """)
+                
+                # Waterfall chart
+                waterfall_data = pd.DataFrame({
+                    'Factor': ['Current UHI', 'Climate Change', 'Urban Growth', 'Mitigation', f'UHI in {year}'],
+                    'Value': [current_uhi, climate_increase, growth_factor, -mitigation_effect, future_uhi],
+                    'Type': ['Total', 'Increase', 'Increase', 'Decrease', 'Total']
+                })
+                
+                fig = go.Figure(go.Waterfall(
+                    name="UHI Components", orientation="v", measure=waterfall_data['Type'],
+                    x=waterfall_data['Factor'], y=waterfall_data['Value'],
+                    connector={"line": {"color": "rgb(63, 63, 63)"}},
+                    increasing={"marker": {"color": "#e74c3c"}},
+                    decreasing={"marker": {"color": "#2ecc71"}},
+                    totals={"marker": {"color": "#3498db"}}
+                ))
+                
+                fig.update_layout(title=f"UHI Intensity Change from 2025 to {year}",
+                                 yaxis_title="Temperature Change (°C)", height=500)
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Temperature distribution comparison
+                st.markdown("#### Temperature Distribution Comparison")
+                
+                # Create synthetic distributions
+                current_temps = data['air_temperature'].values
+                future_temps = current_temps + (future_uhi - current_uhi)
+                future_temps += np.random.normal(0, 0.5, size=len(future_temps))  # Add variability
+                
+                fig = go.Figure()
+                fig.add_trace(go.Histogram(x=current_temps, name='Current (2025)', opacity=0.75,
+                                          marker=dict(color='rgba(52, 152, 219, 0.7)')))
+                fig.add_trace(go.Histogram(x=future_temps, name=f'Projected ({year})', opacity=0.75,
+                                          marker=dict(color='rgba(231, 76, 60, 0.7)')))
+                
+                fig.update_layout(title=f'Temperature Distribution: Current vs {year}',
+                                 xaxis_title='Temperature (°C)', yaxis_title='Frequency',
+                                 barmode='overlay', bargap=0.1, height=400)
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Heat wave risk assessment
+                st.markdown("#### Heat Wave Risk Assessment")
+                
+                # Determine risk level
+                if future_uhi > 5:
+                    risk_level, risk_color = "High", "#e74c3c"
+                elif future_uhi > 3:
+                    risk_level, risk_color = "Medium", "#f39c12"
+                else:
+                    risk_level, risk_color = "Low", "#2ecc71"
+                
+                # Calculate additional metrics
+                extreme_heat_days_current = sum(current_temps > 30) / len(current_temps) * 365
+                extreme_heat_days_future = sum(future_temps > 30) / len(future_temps) * 365
+                
+                st.markdown(f"""
+                <div style="padding:20px; background-color:{risk_color}25; border-left:5px solid {risk_color}; margin-bottom:20px;">
+                    <h4>Heat Wave Risk Level: <span style="color:{risk_color}">{risk_level}</span></h4>
+                    <p>
+                        <strong>Days over 30°C per year:</strong><br>
+                        Current (2025): {extreme_heat_days_current:.1f} days<br>
+                        Projected ({year}): {extreme_heat_days_future:.1f} days<br>
+                        <strong>Increase: {extreme_heat_days_future - extreme_heat_days_current:.1f} days</strong>
+                    </p>
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Recommendations
+                st.markdown("#### Recommendations")
+                
+                if risk_level == "High":
+                    st.markdown("""
+                    To address the high heat wave risk projected in this scenario:
+                    
+                    1. **Implement comprehensive UHI mitigation plan** with emphasis on cooling interventions
+                    2. **Develop heat emergency response protocols** for vulnerable populations
+                    3. **Increase green infrastructure budget** to maximize cooling effect
+                    4. **Revise building codes** to mandate cool roofs and energy-efficient designs
+                    5. **Create cooling centers network** accessible within 10-minute walks citywide
+                    """)
+                elif risk_level == "Medium":
+                    st.markdown("""
+                    To address the medium heat wave risk projected in this scenario:
+                    
+                    1. **Gradually increase green cover** in hotspot areas
+                    2. **Implement cool pavement program** during regular maintenance cycles
+                    3. **Develop targeted interventions** for vulnerable neighborhoods
+                    4. **Create incentives for green roofs** and cool building materials
+                    5. **Monitor temperature trends** and adjust strategies accordingly
+                    """)
+                else:
+                    st.markdown("""
+                    To maintain the low heat wave risk projected in this scenario:
+                    
+                    1. **Continue current mitigation efforts** to maintain progress
+                    2. **Preserve existing green spaces** and expand when possible
+                    3. **Incorporate UHI considerations** in all future development
+                    4. **Monitor temperature data** to detect any unexpected changes
+                    5. **Document successful strategies** to share with other cities
+                    """)
+            else:
+                # Placeholder content
+                st.markdown("""
+                ### Scenario Simulation
+                
+                Configure the parameters on the left and click "Run Simulation" to see projections of future UHI patterns
+                based on different climate change, urban growth, and mitigation scenarios.
+                
+                The simulation will show:
+                - Projected UHI intensity changes
+                - Temperature distribution shifts
+                - Heat wave risk assessment
+                - Tailored recommendations based on outcomes
+                """)
+                
+                # Sample projection chart
+                years = list(range(2025, 2051, 5))
+                no_action = [3.0 + 0.4 * i for i in range(len(years))]
+                moderate_action = [3.0 + 0.3 * i - 0.1 * i**2 for i in range(len(years))]
+                aggressive_action = [3.0 + 0.2 * i - 0.15 * i**2 for i in range(len(years))]
+                
+                scenario_df = pd.DataFrame({
+                    'Year': years * 3,
+                    'UHI Intensity (°C)': no_action + moderate_action + aggressive_action,
+                    'Scenario': ['No Action'] * len(years) + ['Moderate Action'] * len(years) + 
+                                ['Aggressive Action'] * len(years)
+                })
+                
+                fig = px.line(scenario_df, x='Year', y='UHI Intensity (°C)', color='Scenario',
+                             title='UHI Intensity Projections by Mitigation Scenario')
+                fig.update_layout(height=400)
+                st.plotly_chart(fig, use_container_width=True)
+
+def show_about():
+    """Display the about page with project information"""
+    st.markdown('<h2 class="sub-header">About This Project</h2>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="card">
+        <h3>Urban Heat Island Analysis & Mitigation System</h3>
+        <p>This project aims to develop an integrated AI-based system that helps city planners and environmental 
+        scientists detect, analyze, and mitigate urban heat island effects through data-driven decision making.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Key features
+    st.markdown("### Key Features")
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("""
+        #### Detection & Analysis
+        - Satellite imagery analysis for UHI detection
+        - Street-level temperature mapping
+        - Temporal and spatial pattern identification
+        - Cluster analysis of similar urban areas
+        
+        #### Prediction
+        - Machine learning models for temperature prediction
+        - Impact assessment of new developments
+        - Future scenario simulation
+        - Climate change integration
+        """)
+    
+    with col2:
+        st.markdown("""
+        #### Intervention Planning
+        - Customized intervention recommendations
+        - Cost-benefit analysis of strategies
+        - Implementation priority ranking
+        - Visualization of potential impacts
+        
+        #### Optimization
+        - Resource allocation optimization
+        - Multi-objective decision support
+        - Budget-constrained planning
+        - Scenario comparison
+        """)
+    
+    # Technical details
+    st.markdown("### Technical Details")
+    st.markdown("""
+    This system integrates multiple technologies and data sources:
+    
+    - **Satellite Data**: Utilizes freely available Landsat, Sentinel-2, and MODIS data
+    - **Machine Learning**: Employs random forest and gradient boosting models
+    - **Optimization Algorithms**: Uses multi-objective optimization for planning
+    - **GIS Integration**: Provides spatial analysis and mapping capabilities
+    - **Simulation Models**: Enables scenario testing and future projections
+    
+    The application is built using Python and Streamlit, making it accessible through any web browser.
+    No proprietary software or paid services are required to run the system.
+    """)
+    
+    # Data sources
+    st.markdown("### Data Sources")
+    st.markdown("""
+    The system can utilize data from various free sources:
+    
+    - NASA Earth Data (https://earthdata.nasa.gov/)
+    - USGS Earth Explorer (https://earthexplorer.usgs.gov/)
+    - Copernicus Open Access Hub (https://scihub.copernicus.eu/)
+    - OpenStreetMap (https://www.openstreetmap.org/)
+    - National Weather Service (https://www.weather.gov/)
+    - Local municipal GIS data portals
+    
+    For demonstration purposes, this app uses synthetic data that simulates realistic urban temperature patterns.
+    """)
+
+# ---------- MAIN APPLICATION ----------
+def main():
+    """Main application entry point"""
+    # Setup page
+    setup_page()
+    
+    # Page header
+    st.markdown('<h1 class="main-header">Urban Heat Island Analysis & Mitigation System</h1>', unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="highlight">
+        This AI-based system helps city planners and environmental scientists analyze urban heat island (UHI) effects 
+        and develop data-driven strategies to mitigate their impact. Using satellite imagery, environmental data, 
+        and machine learning, it provides insights for sustainable urban planning.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sidebar navigation
+    st.sidebar.image("https://www.epa.gov/sites/default/files/styles/medium/public/2020-07/urban-heat-island.jpg", 
+                    use_container_width=True)
+    st.sidebar.title("Navigation")
+    
+    # Page selection
+    page = st.sidebar.radio("Select a Module", 
+                           ["Dashboard", "UHI Detection", "Temperature Prediction", 
+                            "Intervention Planning", "Optimization & Simulation", "About"])
+    
+    # Load sample data
+    data = load_sample_data()
+    
+    # Display selected page
+    if page == "Dashboard": show_dashboard(data)
+    elif page == "UHI Detection": show_uhi_detection(data)
+    elif page == "Temperature Prediction": show_temperature_prediction(data)
+    elif page == "Intervention Planning": show_intervention_planning(data)
+    elif page == "Optimization & Simulation": show_optimization(data)
+    elif page == "About": show_about()
+    
+    # Footer
+    st.markdown('<div class="footer">Urban Heat Island Analysis & Mitigation System © 2025</div>', 
+               unsafe_allow_html=True)
+
+# Run the application
+if __name__ == "__main__":
+    main()"""
+Urban Heat Island Analysis & Mitigation System - Streamlined Version
+Author: Claude AI
+Date: June 2025
+"""
+
 import streamlit as st
 import numpy as np
 import pandas as pd
@@ -977,405 +1384,3 @@ def show_intervention_planning(data):
                 - Urban streams restoration
                 - Blue roofs
                 """)
-def show_optimization(data):
-    """Display the optimization and simulation module"""
-    st.markdown('<h2 class="sub-header">Optimization & Simulation</h2>', unsafe_allow_html=True)
-    st.markdown('<div class="card">This module uses optimization algorithms to find the most effective allocation of resources for UHI mitigation. It allows planners to simulate different scenarios and compare outcomes.</div>', unsafe_allow_html=True)
-    
-    # Create tabs
-    tab1, tab2 = st.tabs(["Resource Optimization", "Scenario Simulation"])
-    
-    with tab1:
-        st.markdown("### Resource Allocation Optimization")
-        
-        # Inputs
-        budget_level = st.select_slider("Budget level:", options=["low", "medium", "high"])
-        priority = st.selectbox("Optimization priority:", ["temperature", "cost", "implementation"])
-        
-        if st.button("Run Optimization"):
-            # Get optimization results
-            results = optimize_interventions(data, budget_level, priority)
-            
-            # Display metrics
-            col1, col2, col3 = st.columns(3)
-            with col1: st.metric("Total Budget", f"${results['budget']}")
-            with col2: st.metric("Used Budget", f"${results['used_budget']}", 
-                               f"{results['used_budget']/results['budget']*100:.1f}%")
-            with col3: st.metric("Temperature Reduction", f"{results['estimated_temperature_reduction']:.2f}°C")
-            
-            # Resource allocation chart
-            st.markdown("#### Resource Allocation")
-            allocation_df = pd.DataFrame(results['allocation'])
-            
-            fig = px.bar(allocation_df, x='cost', y='name', orientation='h', color='temperature_reduction',
-                        color_continuous_scale='Blues', title='Intervention Resource Allocation',
-                        labels={'cost': 'Budget Allocation ($)', 'name': 'Intervention',
-                               'temperature_reduction': 'Temp. Reduction (°C)'}, text='units')
-            fig.update_traces(texttemplate='%{text} units', textposition='inside')
-            fig.update_layout(height=400)
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Type distribution
-            type_summary = allocation_df.groupby('type').agg({
-                'cost': 'sum', 'temperature_reduction': 'sum', 'units': 'sum'
-            }).reset_index()
-            
-            fig = px.pie(type_summary, values='cost', names='type',
-                        title='Budget Distribution by Intervention Type', hole=0.4)
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Cost-effectiveness analysis
-            st.markdown("#### Cost-Effectiveness Analysis")
-            allocation_df['cost_per_degree'] = allocation_df['cost'] / allocation_df['temperature_reduction']
-            cost_effectiveness = allocation_df.sort_values('cost_per_degree')
-            
-            fig = px.bar(cost_effectiveness, x='name', y='cost_per_degree', color='type',
-                        title='Cost per Degree of Cooling ($ / °C)',
-                        labels={'cost_per_degree': 'Cost per °C Reduction ($)', 'name': 'Intervention'})
-            fig.update_layout(height=400)
-            st.plotly_chart(fig, use_container_width=True)
-            
-            # Implementation timeline
-            st.markdown("#### Implementation Timeline")
-            
-            # Create simple timeline data
-            timeline_data = []
-            start_date = datetime.date(2025, 7, 1)
-            
-            for i, row in allocation_df.iterrows():
-                # Assign durations based on type
-                if row['type'] == 'Green Infrastructure': duration = 90
-                elif row['type'] == 'High-Albedo Surfaces': duration = 60
-                elif row['type'] == 'Water Features': duration = 120
-                else: duration = 30
-                
-                end_date = start_date + datetime.timedelta(days=duration)
-                timeline_data.append({
-                    'Task': row['name'], 'Start': start_date, 'Finish': end_date, 'Type': row['type']
-                })
-                start_date = start_date + datetime.timedelta(days=30)
-            
-            timeline_df = pd.DataFrame(timeline_data)
-            
-            fig = px.timeline(timeline_df, x_start='Start', x_end='Finish', y='Task',
-                             color='Type', title='Implementation Timeline')
-            fig.update_yaxes(autorange="reversed")
-            fig.update_layout(height=400)
-            st.plotly_chart(fig, use_container_width=True)
-    
-    with tab2:
-        st.markdown("### Future Scenario Simulation")
-        
-        # Inputs
-        col1, col2 = st.columns([1, 2])
-        
-        with col1:
-            st.markdown("#### Scenario Parameters")
-            year = st.slider("Target Year:", 2025, 2050, 2030, 5)
-            urban_growth = st.select_slider("Urban Growth Rate:", options=["Low", "Medium", "High"])
-            climate_scenario = st.select_slider("Climate Change Scenario:", 
-                                               options=["Optimistic", "Moderate", "Pessimistic"])
-            mitigation_level = st.select_slider("UHI Mitigation Implementation:", 
-                                              options=["Minimal", "Moderate", "Aggressive"])
-            simulate_button = st.button("Run Simulation")
-        
-        with col2:
-            if simulate_button:
-                st.markdown("#### Simulation Results")
-                
-                # Calculate climate scenario impacts
-                if climate_scenario == "Optimistic":
-                    climate_increase = 0.5 * (year - 2025) / 5  # 0.5°C per 5 years
-                elif climate_scenario == "Moderate":
-                    climate_increase = 1.0 * (year - 2025) / 5  # 1.0°C per 5 years
-                else:  # Pessimistic
-                    climate_increase = 1.5 * (year - 2025) / 5  # 1.5°C per 5 years
-                
-                # Calculate urban growth impacts
-                if urban_growth == "Low":
-                    growth_factor = 0.2 * (year - 2025) / 5  # 0.2°C per 5 years
-                elif urban_growth == "Medium":
-                    growth_factor = 0.5 * (year - 2025) / 5  # 0.5°C per 5 years
-                else:  # High
-                    growth_factor = 0.8 * (year - 2025) / 5  # 0.8°C per 5 years
-                
-                # Calculate mitigation effects
-                if mitigation_level == "Minimal":
-                    mitigation_effect = 0.2 * (year - 2025) / 5  # 0.2°C reduction per 5 years
-                elif mitigation_level == "Moderate":
-                    mitigation_effect = 0.7 * (year - 2025) / 5  # 0.7°C reduction per 5 years
-                else:  # Aggressive
-                    mitigation_effect = 1.2 * (year - 2025) / 5  # 1.2°C reduction per 5 years
-                
-                # Calculate UHI change
-                current_uhi = data['air_temperature'].mean() - 25  # Assuming 25°C is the baseline
-                future_uhi = current_uhi + climate_increase + growth_factor - mitigation_effect
-                
-                # Display results
-                st.markdown(f"""
-                #### Projected UHI Intensity for {year}
-                
-                **Current UHI Intensity (2025):** {current_uhi:.2f}°C  
-                **Projected UHI Intensity ({year}):** {future_uhi:.2f}°C  
-                
-                **Contributing Factors:**
-                - Climate change impact: +{climate_increase:.2f}°C
-                - Urban growth impact: +{growth_factor:.2f}°C
-                - Mitigation effect: -{mitigation_effect:.2f}°C
-                
-                **Net Change:** {future_uhi - current_uhi:.2f}°C
-                """)
-                
-                # Waterfall chart
-                waterfall_data = pd.DataFrame({
-                    'Factor': ['Current UHI', 'Climate Change', 'Urban Growth', 'Mitigation', f'UHI in {year}'],
-                    'Value': [current_uhi, climate_increase, growth_factor, -mitigation_effect, future_uhi],
-                    'Type': ['Total', 'Increase', 'Increase', 'Decrease', 'Total']
-                })
-                
-                fig = go.Figure(go.Waterfall(
-                    name="UHI Components", orientation="v", measure=waterfall_data['Type'],
-                    x=waterfall_data['Factor'], y=waterfall_data['Value'],
-                    connector={"line": {"color": "rgb(63, 63, 63)"}},
-                    increasing={"marker": {"color": "#e74c3c"}},
-                    decreasing={"marker": {"color": "#2ecc71"}},
-                    totals={"marker": {"color": "#3498db"}}
-                ))
-                
-                fig.update_layout(title=f"UHI Intensity Change from 2025 to {year}",
-                                 yaxis_title="Temperature Change (°C)", height=500)
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Temperature distribution comparison
-                st.markdown("#### Temperature Distribution Comparison")
-                
-                # Create synthetic distributions
-                current_temps = data['air_temperature'].values
-                future_temps = current_temps + (future_uhi - current_uhi)
-                future_temps += np.random.normal(0, 0.5, size=len(future_temps))  # Add variability
-                
-                fig = go.Figure()
-                fig.add_trace(go.Histogram(x=current_temps, name='Current (2025)', opacity=0.75,
-                                          marker=dict(color='rgba(52, 152, 219, 0.7)')))
-                fig.add_trace(go.Histogram(x=future_temps, name=f'Projected ({year})', opacity=0.75,
-                                          marker=dict(color='rgba(231, 76, 60, 0.7)')))
-                
-                fig.update_layout(title=f'Temperature Distribution: Current vs {year}',
-                                 xaxis_title='Temperature (°C)', yaxis_title='Frequency',
-                                 barmode='overlay', bargap=0.1, height=400)
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Heat wave risk assessment
-                st.markdown("#### Heat Wave Risk Assessment")
-                
-                # Determine risk level
-                if future_uhi > 5:
-                    risk_level, risk_color = "High", "#e74c3c"
-                elif future_uhi > 3:
-                    risk_level, risk_color = "Medium", "#f39c12"
-                else:
-                    risk_level, risk_color = "Low", "#2ecc71"
-                
-                # Calculate additional metrics
-                extreme_heat_days_current = sum(current_temps > 30) / len(current_temps) * 365
-                extreme_heat_days_future = sum(future_temps > 30) / len(future_temps) * 365
-                
-                st.markdown(f"""
-                <div style="padding:20px; background-color:{risk_color}25; border-left:5px solid {risk_color}; margin-bottom:20px;">
-                    <h4>Heat Wave Risk Level: <span style="color:{risk_color}">{risk_level}</span></h4>
-                    <p>
-                        <strong>Days over 30°C per year:</strong><br>
-                        Current (2025): {extreme_heat_days_current:.1f} days<br>
-                        Projected ({year}): {extreme_heat_days_future:.1f} days<br>
-                        <strong>Increase: {extreme_heat_days_future - extreme_heat_days_current:.1f} days</strong>
-                    </p>
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Recommendations
-                st.markdown("#### Recommendations")
-                
-                if risk_level == "High":
-                    st.markdown("""
-                    To address the high heat wave risk projected in this scenario:
-                    
-                    1. **Implement comprehensive UHI mitigation plan** with emphasis on cooling interventions
-                    2. **Develop heat emergency response protocols** for vulnerable populations
-                    3. **Increase green infrastructure budget** to maximize cooling effect
-                    4. **Revise building codes** to mandate cool roofs and energy-efficient designs
-                    5. **Create cooling centers network** accessible within 10-minute walks citywide
-                    """)
-                elif risk_level == "Medium":
-                    st.markdown("""
-                    To address the medium heat wave risk projected in this scenario:
-                    
-                    1. **Gradually increase green cover** in hotspot areas
-                    2. **Implement cool pavement program** during regular maintenance cycles
-                    3. **Develop targeted interventions** for vulnerable neighborhoods
-                    4. **Create incentives for green roofs** and cool building materials
-                    5. **Monitor temperature trends** and adjust strategies accordingly
-                    """)
-                else:
-                    st.markdown("""
-                    To maintain the low heat wave risk projected in this scenario:
-                    
-                    1. **Continue current mitigation efforts** to maintain progress
-                    2. **Preserve existing green spaces** and expand when possible
-                    3. **Incorporate UHI considerations** in all future development
-                    4. **Monitor temperature data** to detect any unexpected changes
-                    5. **Document successful strategies** to share with other cities
-                    """)
-            else:
-                # Placeholder content
-                st.markdown("""
-                ### Scenario Simulation
-                
-                Configure the parameters on the left and click "Run Simulation" to see projections of future UHI patterns
-                based on different climate change, urban growth, and mitigation scenarios.
-                
-                The simulation will show:
-                - Projected UHI intensity changes
-                - Temperature distribution shifts
-                - Heat wave risk assessment
-                - Tailored recommendations based on outcomes
-                """)
-                
-                # Sample projection chart
-                years = list(range(2025, 2051, 5))
-                no_action = [3.0 + 0.4 * i for i in range(len(years))]
-                moderate_action = [3.0 + 0.3 * i - 0.1 * i**2 for i in range(len(years))]
-                aggressive_action = [3.0 + 0.2 * i - 0.15 * i**2 for i in range(len(years))]
-                
-                scenario_df = pd.DataFrame({
-                    'Year': years * 3,
-                    'UHI Intensity (°C)': no_action + moderate_action + aggressive_action,
-                    'Scenario': ['No Action'] * len(years) + ['Moderate Action'] * len(years) + 
-                                ['Aggressive Action'] * len(years)
-                })
-                
-                fig = px.line(scenario_df, x='Year', y='UHI Intensity (°C)', color='Scenario',
-                             title='UHI Intensity Projections by Mitigation Scenario')
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
-
-def show_about():
-    """Display the about page with project information"""
-    st.markdown('<h2 class="sub-header">About This Project</h2>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="card">
-        <h3>Urban Heat Island Analysis & Mitigation System</h3>
-        <p>This project aims to develop an integrated AI-based system that helps city planners and environmental 
-        scientists detect, analyze, and mitigate urban heat island effects through data-driven decision making.</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Key features
-    st.markdown("### Key Features")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("""
-        #### Detection & Analysis
-        - Satellite imagery analysis for UHI detection
-        - Street-level temperature mapping
-        - Temporal and spatial pattern identification
-        - Cluster analysis of similar urban areas
-        
-        #### Prediction
-        - Machine learning models for temperature prediction
-        - Impact assessment of new developments
-        - Future scenario simulation
-        - Climate change integration
-        """)
-    
-    with col2:
-        st.markdown("""
-        #### Intervention Planning
-        - Customized intervention recommendations
-        - Cost-benefit analysis of strategies
-        - Implementation priority ranking
-        - Visualization of potential impacts
-        
-        #### Optimization
-        - Resource allocation optimization
-        - Multi-objective decision support
-        - Budget-constrained planning
-        - Scenario comparison
-        """)
-    
-    # Technical details
-    st.markdown("### Technical Details")
-    st.markdown("""
-    This system integrates multiple technologies and data sources:
-    
-    - **Satellite Data**: Utilizes freely available Landsat, Sentinel-2, and MODIS data
-    - **Machine Learning**: Employs random forest and gradient boosting models
-    - **Optimization Algorithms**: Uses multi-objective optimization for planning
-    - **GIS Integration**: Provides spatial analysis and mapping capabilities
-    - **Simulation Models**: Enables scenario testing and future projections
-    
-    The application is built using Python and Streamlit, making it accessible through any web browser.
-    No proprietary software or paid services are required to run the system.
-    """)
-    
-    # Data sources
-    st.markdown("### Data Sources")
-    st.markdown("""
-    The system can utilize data from various free sources:
-    
-    - NASA Earth Data (https://earthdata.nasa.gov/)
-    - USGS Earth Explorer (https://earthexplorer.usgs.gov/)
-    - Copernicus Open Access Hub (https://scihub.copernicus.eu/)
-    - OpenStreetMap (https://www.openstreetmap.org/)
-    - National Weather Service (https://www.weather.gov/)
-    - Local municipal GIS data portals
-    
-    For demonstration purposes, this app uses synthetic data that simulates realistic urban temperature patterns.
-    """)
-
-# ---------- MAIN APPLICATION ----------
-def main():
-    """Main application entry point"""
-    # Setup page
-    setup_page()
-    
-    # Page header
-    st.markdown('<h1 class="main-header">Urban Heat Island Analysis & Mitigation System</h1>', unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="highlight">
-        This AI-based system helps city planners and environmental scientists analyze urban heat island (UHI) effects 
-        and develop data-driven strategies to mitigate their impact. Using satellite imagery, environmental data, 
-        and machine learning, it provides insights for sustainable urban planning.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Sidebar navigation
-    st.sidebar.image("https://www.epa.gov/sites/default/files/styles/medium/public/2020-07/urban-heat-island.jpg", 
-                    use_container_width=True)
-    st.sidebar.title("Navigation")
-    
-    # Page selection
-    page = st.sidebar.radio("Select a Module", 
-                           ["Dashboard", "UHI Detection", "Temperature Prediction", 
-                            "Intervention Planning", "Optimization & Simulation", "About"])
-    
-    # Load sample data
-    data = load_sample_data()
-    
-    # Display selected page
-    if page == "Dashboard": show_dashboard(data)
-    elif page == "UHI Detection": show_uhi_detection(data)
-    elif page == "Temperature Prediction": show_temperature_prediction(data)
-    elif page == "Intervention Planning": show_intervention_planning(data)
-    elif page == "Optimization & Simulation": show_optimization(data)
-    elif page == "About": show_about()
-    
-    # Footer
-    st.markdown('<div class="footer">Urban Heat Island Analysis & Mitigation System © 2025</div>', 
-               unsafe_allow_html=True)
-
-# Run the application
-if __name__ == "__main__":
-    main()
