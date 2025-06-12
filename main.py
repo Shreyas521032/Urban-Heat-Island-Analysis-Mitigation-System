@@ -12,11 +12,8 @@ from sklearn.preprocessing import StandardScaler
 import warnings
 import ee
 import json
-
-# Suppress warnings
 warnings.filterwarnings('ignore')
 
-# ---------- PAGE SETUP AND CONFIGURATION ----------
 def setup_page():
     st.set_page_config(page_title="UHI Analysis System", page_icon="🌆", layout="wide")
     st.markdown("""
@@ -32,7 +29,6 @@ def setup_page():
     </style>
     """, unsafe_allow_html=True)
 
-# ---------- DATA GENERATION AND ANALYSIS FUNCTIONS ----------
 def load_sample_data():
     """Generate synthetic UHI data for demonstration"""
     np.random.seed(42)
@@ -1334,7 +1330,6 @@ def show_about():
     For demonstration purposes, this app uses synthetic data that simulates realistic urban temperature patterns.
     """)
 
-# ---------- MAIN APPLICATION ----------
 def main():
     """Main application entry point"""
     # Setup page
@@ -1371,9 +1366,8 @@ def main():
     elif page == "About": show_about()
     
     # Footer
-    st.markdown('<div class="footer">Urban Heat Island Analysis & Mitigation System © 2025</div>', 
+    st.markdown('<div class="footer">Crafted with ❤️ in Green Skills © 2025</div>', 
                unsafe_allow_html=True)
 
-# Run the application
 if __name__ == "__main__":
     main()
