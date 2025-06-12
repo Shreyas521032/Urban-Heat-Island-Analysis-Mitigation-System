@@ -990,8 +990,7 @@ def show_optimization(data):
         budget_level = st.select_slider("Budget level:", options=["low", "medium", "high"])
         priority = st.selectbox("Optimization priority:", ["temperature", "cost", "implementation"])
         
-        if st.button("Rundef show_uhi_detection(data):
-    """Display the UHI detection and analysis module"""
+        if st.button("UHI detection"):
     st.markdown('<h2 class="sub-header">UHI Detection & Analysis</h2>', unsafe_allow_html=True)
     st.markdown('<div class="card">This module uses ground temperature measurements and urban feature analysis to detect urban heat island hotspots in Nagpur.</div>', unsafe_allow_html=True)
     
